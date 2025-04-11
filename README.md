@@ -4,13 +4,14 @@
 
 ## ✨ Features
 
-- Fully encrypted vault using [ChaCha20Poly1305](https://docs.rs/chacha20poly1305/)
-- Master password secured via [Argon2](https://docs.rs/argon2/)
-- Zero network access – works entirely **offline**
-- Simple CLI interface:
-  - `init` – initialize a new vault
-  - `add` – add a new entry
-  - `get` – retrieve an entry
+- **Strong Encryption**: Fully encrypted vault using [ChaCha20Poly1305](https://docs.rs/chacha20poly1305/).
+- **Secure Master Password**: Secured via [Argon2](https://docs.rs/argon2/), a memory-hard password hashing algorithm.
+- **Offline-First**: Zero network access – works entirely **offline**.
+- **Simple CLI Commands**:
+  - `init` – Initialize a new vault.
+  - `add` – Add a new entry with a name and username.
+  - `get` – Retrieve an entry by name (optionally print the password with `--show`).
+  - `list` – List all saved entries with optional filters and sorting.
 
 ## 🧪 Quick Demo
 
@@ -18,22 +19,31 @@
 $ dplock init
 🔐 Vault initialized!
 
-$ dplock add github dpway secret123
+$ dplock add github dpway
+🔑 Enter password: ******
 ✅ Entry added: github
 
 $ dplock get github
 🔐 Username: dpway
+🔑 Password copied to clipboard!
+
+$ dplock get github --show
+🔐 Username: dpway
 🔑 Password: secret123
+
+$ dplock list --filter git --sort name
+📒 Entries:
+• github (👤 dpway)
 ```
 
 ## 🛠 Installation
 
-**Requirements:**
+### Requirements
 
-- Rust (v1.86 or newer)
-- Linux / macOS / Windows
+- **Rust**: Version 1.86 or newer.
+- **Supported Platforms**: Linux, macOS, Windows.
 
-**Build from source:**
+### Build from Source
 
 ```bash
 git clone https://github.com/dpway0/dplock
@@ -45,13 +55,69 @@ The compiled binary will be located at `target/release/dplock`.
 
 ## 🔐 Vault & Security
 
-- Vault is stored at: `~/.dplock/vault.bin`
-- Data is encrypted using a key derived from your master password
-- No telemetry, no cloud, no syncing – your data stays local
+- **Vault Location**: `~/.dplock/vault.bin`.
+- **Encryption**: Data is encrypted using a key derived from your master password.
+- **Privacy**: No telemetry, no cloud, no syncing – your data stays local.
+
+## 📖 CLI Commands
+
+### `init`
+Initialize a new vault.
+
+```bash
+dplock init
+```
+
+### `add`
+Add a new password entry.
+
+```bash
+dplock add <name> <username>
+```
+
+- `<name>`: The name of the entry (e.g., "github").
+- `<username>`: The username associated with the entry.
+
+### `get`
+Retrieve a password by name.
+
+```bash
+dplock get <name> [--show]
+```
+
+- `<name>`: The name of the entry to retrieve.
+- `--show`: Print the password instead of copying it to the clipboard.
+
+### `list`
+List all saved entries.
+
+```bash
+dplock list [--filter <KEY>] [--sort <FIELD>]
+```
+
+- `--filter <KEY>`: Filter entries by name or username.
+- `--sort <FIELD>`: Sort entries by `name` or `username`.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Feel free to open issues, suggest features, or send pull requests.
+Contributions are welcome! Feel free to:
+
+- Open issues for bugs or feature requests.
+- Suggest improvements or new features.
+- Submit pull requests.
+
+### Development Setup
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/dpway0/dplock
+   cd dplock
+   ```
+2. Build and test:
+   ```bash
+   cargo build
+   cargo test
+   ```
 
 ---
 
