@@ -1,6 +1,7 @@
 mod cli;
 mod crypto;
 mod vault;
+mod utils;
 
 use anyhow::Result;
 use cli::build_cli;
@@ -16,12 +17,17 @@ fn main() -> Result<()> {
         Some(("add", sub)) => {
             let name = sub.get_one::<String>("name").unwrap();
             let username = sub.get_one::<String>("username").unwrap();
-            let password = sub.get_one::<String>("password").unwrap();
-            Vault::add(name, username, password)?;
+            Vault::add(name, username)?;
         }
         Some(("get", sub)) => {
             let name = sub.get_one::<String>("name").unwrap();
-            Vault::get(name)?;
+            let show = sub.get_flag("show");
+            Vault::get(name, show)?;
+        }
+        Some(("list", sub)) => {
+            let filter = sub.get_one::<String>("filter").map(|s| s.as_str());
+            let sort = sub.get_one::<String>("sort").map(|s| s.as_str());
+            Vault::list(filter, sort)?;
         }
         _ => {}
     }
