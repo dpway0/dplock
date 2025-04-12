@@ -19,7 +19,7 @@ pub struct Entry {
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct VaultData {
-    pub entries: HashMap<String, Entry>,
+    pub entries: HashMap<String, Vec<Entry>>,
 }
 
 pub struct Vault;
@@ -59,16 +59,15 @@ impl Vault {
         let entry_pass = Self::prompt_master_password("🔑 Entry password: ")?;
         let mut data = Self::load_vault(&master)?;
 
-        data.entries.insert(
-            name.to_string(),
-            Entry {
-                username: username.to_string(),
-                password: entry_pass,
-            },
-        );
+        let entry = Entry {
+            username: username.to_string(),
+            password: entry_pass,
+        };
+
+        data.entries.entry(name.to_string()).or_default().push(entry);
 
         Self::save_vault(&data, &master)?;
-        println!("✅ Entry added: {}", name);
+        println!("✅ Entry added under: {}", name);
         Ok(())
     }
 
@@ -76,13 +75,16 @@ impl Vault {
         let password = Self::prompt_master_password("Master password: ")?;
         let data = Self::load_vault(&password)?;
 
-        if let Some(entry) = data.entries.get(name) {
-            println!("🔐 Username: {}", entry.username);
-            if show {
-                println!("🔑 Password: {}", entry.password);
-            } else {
-                Self::copy_to_clipboard(&entry.password)?;
-                println!("📋 Password copied to clipboard!");
+        if let Some(entries) = data.entries.get(name) {
+            println!("🔐 Found {} entr{} for: {}", entries.len(), if entries.len() > 1 { "ies" } else { "y" }, name);
+            for (i, entry) in entries.iter().enumerate() {
+                println!("{}. 👤 Username: {}", i + 1, entry.username);
+                if show {
+                    println!("   🔑 Password: {}", entry.password);
+                } else {
+                    Self::copy_to_clipboard(&entry.password)?;
+                    println!("   📋 Password copied to clipboard!");
+                }
             }
         } else {
             println!("❌ Entry not found");
@@ -95,7 +97,10 @@ impl Vault {
         let password = prompt_password("Master password: ")?;
         let data = Self::load(&password)?;
 
-        let mut entries: Vec<_> = data.entries.iter().collect();
+        let mut entries: Vec<_> = data.entries.iter().flat_map(|(name, entry_list)| {
+            entry_list.iter().map(move |entry| (name, entry))
+        }).collect();
+
         Self::apply_filter_and_sort(&mut entries, filter, sort);
 
         if entries.is_empty() {
@@ -107,6 +112,51 @@ impl Vault {
         Self::paginate_entries(entries)?;
         Ok(())
     }
+
+    pub fn remove(name: &str, index: Option<usize>) -> Result<()> {
+        let master = Self::prompt_master_password("🔐 Master password: ")?;
+        let mut data = Self::load_vault(&master)?;
+
+        match data.entries.get_mut(name) {
+            Some(entry_list) => {
+                if let Some(idx) = index {
+                    if idx == 0 || idx > entry_list.len() {
+                        println!("❌ Invalid index. Use: 1..{}.", entry_list.len());
+                        return Ok(());
+                    }
+                    let removed = entry_list.remove(idx - 1);
+                    println!("🗑️ Removed entry: {} (👤 {})", name, removed.username);
+
+                    if entry_list.is_empty() {
+                        data.entries.remove(name);
+                    }
+                } else {
+                    // Cảnh báo khi xóa toàn bộ entries
+                    println!("⚠️  This will remove ALL {} entr{} under '{}'.",
+                             entry_list.len(),
+                             if entry_list.len() > 1 { "ies" } else { "y" },
+                             name);
+
+                    let confirm = Self::prompt_master_password("Type 'yes' to confirm: ")?;
+                    if confirm.trim() != "yes" {
+                        println!("❌ Cancelled.");
+                        return Ok(());
+                    }
+
+                    data.entries.remove(name);
+                    println!("🗑️ All entries under '{}' removed.", name);
+                }
+
+                Self::save_vault(&data, &master)?;
+            }
+            None => {
+                println!("❌ Entry name not found.");
+            }
+        }
+
+        Ok(())
+    }
+
 
     fn load(password: &str) -> Result<VaultData> {
         let bytes = fs::read(Self::vault_path())?;
@@ -160,7 +210,7 @@ impl Vault {
         if let Some(sort_key) = sort {
             match sort_key {
                 "name" => entries.sort_by_key(|(name, _)| *name),
-                "user" => entries.sort_by_key(|(_, entry)| &entry.username),
+                "username" => entries.sort_by_key(|(_, entry)| &entry.username),
                 _ => {}
             }
         }

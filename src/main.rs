@@ -20,28 +20,38 @@ fn main() -> Result<()> {
 fn handle_subcommand(cmd: &str, sub: &clap::ArgMatches) -> Result<()> {
     match cmd {
         "init" => Vault::init()?,
-        "add" => handle_add_command(sub)?,
-        "get" => handle_get_command(sub)?,
-        "list" => handle_list_command(sub)?,
-        _ => {}
+        "add" => handle_add(sub)?,
+        "get" => handle_get(sub)?,
+        "list" => handle_list(sub)?,
+        "remove" => handle_remove(sub)?,
+        _ => {
+            println!("❌ Unknown command: {}", cmd);
+        }
     }
     Ok(())
 }
 
-fn handle_add_command(sub: &clap::ArgMatches) -> Result<()> {
+fn handle_add(sub: &clap::ArgMatches) -> Result<()> {
     let name = sub.get_one::<String>("name").unwrap();
     let username = sub.get_one::<String>("username").unwrap();
     Vault::add(name, username)
 }
 
-fn handle_get_command(sub: &clap::ArgMatches) -> Result<()> {
+fn handle_get(sub: &clap::ArgMatches) -> Result<()> {
     let name = sub.get_one::<String>("name").unwrap();
     let show = sub.get_flag("show");
     Vault::get(name, show)
 }
 
-fn handle_list_command(sub: &clap::ArgMatches) -> Result<()> {
-    let filter = sub.get_one::<String>("filter").map(|s| s.as_str());
-    let sort = sub.get_one::<String>("sort").map(|s| s.as_str());
+fn handle_list(sub: &clap::ArgMatches) -> Result<()> {
+    let filter = sub.get_one::<String>("filter").map(String::as_str);
+    let sort = sub.get_one::<String>("sort").map(String::as_str);
     Vault::list(filter, sort)
+}
+
+fn handle_remove(sub: &clap::ArgMatches) -> Result<()> {
+    let name = sub.get_one::<String>("name").unwrap();
+    let index = sub.get_one::<String>("index")
+        .map(|i| i.parse::<usize>().unwrap_or(0));
+    Vault::remove(name, index)
 }

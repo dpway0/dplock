@@ -1,7 +1,8 @@
 use clap::{arg, Command};
 
 fn init_subcommand() -> Command {
-    Command::new("init").about("Initialize a new vault")
+    Command::new("init")
+        .about("Initialize a new vault")
 }
 
 fn add_subcommand() -> Command {
@@ -25,11 +26,19 @@ fn list_subcommand() -> Command {
         .arg(arg!(--sort <FIELD> "Sort by 'name' or 'username'"))
 }
 
+fn remove_subcommand() -> Command {
+    Command::new("remove")
+        .about("Remove password entry by name (optional: specify --index to remove one entry)")
+        .arg(arg!(<name> "Entry name to remove"))
+        .arg(arg!(--index <INDEX> "Specify the index of the entry to remove (starts from 1)"))
+}
+
 pub fn build_cli() -> Command {
     Command::new("dplock")
-        .about("Minimal password manager - offline and secure")
+        .about("Minimal password manager — offline and secure")
         .subcommand(init_subcommand())
         .subcommand(add_subcommand())
         .subcommand(get_subcommand())
         .subcommand(list_subcommand())
+        .subcommand(remove_subcommand())
 }
