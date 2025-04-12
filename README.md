@@ -12,6 +12,7 @@
   - `add` – Add a new entry with a name and username.
   - `get` – Retrieve an entry by name (optionally print the password with `--show`).
   - `list` – List all saved entries with optional filters and sorting.
+  - **Utility**: Clear the terminal screen for better readability.
 
 ## 🧪 Quick Demo
 
@@ -97,6 +98,13 @@ dplock list [--filter <KEY>] [--sort <FIELD>]
 
 - `--filter <KEY>`: Filter entries by name or username.
 - `--sort <FIELD>`: Sort entries by `name` or `username`.
+
+### `clear`
+Clear the terminal screen.
+
+```bash
+dplock clear
+```
 
 ## 🤝 Contributing
 
