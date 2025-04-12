@@ -9,15 +9,15 @@ use crossterm::event::{Event, KeyCode};
 use crossterm::{event};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use textwrap::wrap;
-use crate::utils::get_terminal_width;
+use crate::utils::{get_terminal_width, is_encrypted};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Entry {
     pub username: String,
     pub password: String,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct VaultData {
     pub entries: HashMap<String, Vec<Entry>>,
 }
@@ -157,7 +157,6 @@ impl Vault {
         Ok(())
     }
 
-
     fn load(password: &str) -> Result<VaultData> {
         let bytes = fs::read(Self::vault_path())?;
         let data: VaultData = crypto::decrypt(&bytes, password)?;
@@ -248,6 +247,68 @@ impl Vault {
             }
         }
 
+        Ok(())
+    }
+
+    pub fn export(path: &str, plain: bool) -> Result<()> {
+        let master = Self::prompt_master_password("🔐 Master password: ")?;
+        let data = Self::load_vault(&master)?;
+
+        if plain {
+            let json = serde_json::to_string_pretty(&data)?;
+            fs::write(path, json)?;
+            println!("📄 Vault exported as plain JSON: {}", path);
+        } else {
+            let mut safe_data = data.clone();
+
+            for entry_list in safe_data.entries.values_mut() {
+                for entry in entry_list.iter_mut() {
+                    entry.password = crypto::encrypt_entry(&entry.password, &master)?;
+                }
+            }
+
+            let json = serde_json::to_string_pretty(&safe_data)?;
+            fs::write(path, json)?;
+            println!("🔒 Vault exported (passwords encrypted) to: {}", path);
+        }
+
+        Ok(())
+    }
+
+    pub fn import(path: &str, plain: bool) -> Result<()> {
+        let json = std::fs::read(path)?;
+
+        if is_encrypted(&json) && plain {
+            println!("⚠️ Warning: The file appears to be encrypted, but you are attempting to import it as plain text.");
+            let confirm = prompt_password("Do you want to proceed with plain text import? (yes/no): ")?;
+            if confirm.trim().to_lowercase() != "yes" {
+                println!("❌ Import cancelled.");
+                return Ok(());
+            }
+        }
+
+        let imported_data: VaultData = serde_json::from_slice(&json)?;
+
+        let master = Self::prompt_master_password("🔐 Master password: ")?;
+        let mut current_data = Self::load_vault(&master)?;
+
+        for (name, new_entries) in imported_data.entries {
+            let entry_list = current_data.entries.entry(name).or_default();
+            for mut new_entry in new_entries {
+                if !plain {
+                    new_entry.password = crypto::decrypt_entry(&new_entry.password, &master)?;
+                }
+                let is_duplicate = entry_list.iter().any(|e|
+                e.username == new_entry.username && e.password == new_entry.password
+                );
+                if !is_duplicate {
+                    entry_list.push(new_entry);
+                }
+            }
+        }
+
+        Self::save_vault(&current_data, &master)?;
+        println!("✅ Vault imported and merged successfully.");
         Ok(())
     }
 }

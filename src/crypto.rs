@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use argon2::{Argon2, PasswordHasher};
-use argon2::password_hash::{SaltString};
+use argon2::password_hash::SaltString;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use chacha20poly1305::aead::{Aead, KeyInit};
@@ -63,4 +63,15 @@ fn derive_key(password: &str, salt: &[u8]) -> Result<Key> {
     key[..copy_len].copy_from_slice(&key_bytes[..copy_len]);
 
     Ok(*Key::from_slice(&key))
+}
+
+pub fn encrypt_entry(password: &str, master: &str) -> Result<String> {
+    let encrypted = encrypt(&password, master)?;
+    Ok(base64::encode(&encrypted))
+}
+
+pub fn decrypt_entry(encoded: &str, master: &str) -> Result<String> {
+    let bytes = base64::decode(encoded)?;
+    let decrypted: String = decrypt(&bytes, master)?;
+    Ok(decrypted)
 }

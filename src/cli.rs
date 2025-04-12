@@ -32,6 +32,22 @@ fn remove_subcommand() -> Command {
         .arg(arg!(<name> "Entry name to remove"))
         .arg(arg!(--index <INDEX> "Specify the index of the entry to remove (starts from 1)"))
 }
+fn export_subcommand() -> Command {
+    Command::new("export")
+        .about("Export vault to a JSON file (unencrypted)")
+        .arg(arg!(<path> "Path to export the JSON file"))
+        .arg(
+            arg!(--plain "Export passwords as plain text (⚠️ unsafe)"),
+        )
+}
+
+fn import_subcommand() -> Command {
+    Command::new("import")
+        .about("Import vault from a JSON file")
+        .arg(arg!(<path> "Path to the JSON file to import"))
+        .arg(arg!(--plain "Import passwords as plain text (⚠️ unsafe)"))
+}
+
 
 pub fn build_cli() -> Command {
     Command::new("dplock")
@@ -41,4 +57,6 @@ pub fn build_cli() -> Command {
         .subcommand(get_subcommand())
         .subcommand(list_subcommand())
         .subcommand(remove_subcommand())
+        .subcommand(export_subcommand())
+        .subcommand(import_subcommand())
 }

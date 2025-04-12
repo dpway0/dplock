@@ -24,6 +24,8 @@ fn handle_subcommand(cmd: &str, sub: &clap::ArgMatches) -> Result<()> {
         "get" => handle_get(sub)?,
         "list" => handle_list(sub)?,
         "remove" => handle_remove(sub)?,
+        "export" => handle_export(sub)?,
+        "import" => handle_import(sub)?,
         _ => {
             println!("❌ Unknown command: {}", cmd);
         }
@@ -54,4 +56,16 @@ fn handle_remove(sub: &clap::ArgMatches) -> Result<()> {
     let index = sub.get_one::<String>("index")
         .map(|i| i.parse::<usize>().unwrap_or(0));
     Vault::remove(name, index)
+}
+
+fn handle_export(sub: &clap::ArgMatches) -> Result<()> {
+    let path = sub.get_one::<String>("path").unwrap();
+    let plain = sub.get_flag("plain");
+    Vault::export(path, plain)
+}
+
+fn handle_import(sub: &clap::ArgMatches) -> Result<()> {
+    let path = sub.get_one::<String>("path").unwrap();
+    let plain = sub.get_flag("plain");
+    Vault::import(path, plain)
 }

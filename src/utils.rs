@@ -7,3 +7,7 @@ pub fn get_terminal_width() -> usize {
         80 // fallback
     }
 }
+
+pub fn is_encrypted(data: &[u8]) -> bool {
+    data.len() > 16 + 12
+}
