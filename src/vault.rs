@@ -75,8 +75,20 @@ impl Vault {
         let password = Self::prompt_master_password("Master password: ")?;
         let data = Self::load_vault(&password)?;
 
-        if let Some(entries) = data.entries.get(name) {
-            println!("🔐 Found {} entr{} for: {}", entries.len(), if entries.len() > 1 { "ies" } else { "y" }, name);
+        let regex = regex::Regex::new(name).map_err(|e| anyhow!("Invalid regex: {e}"))?;
+
+        let matched = data.entries.iter()
+            .filter(|(key, _)| regex.is_match(key))
+            .collect::<Vec<_>>();
+
+        if matched.is_empty() {
+            println!("❌ No entries found matching: '{}'", name);
+            return Ok(());
+        }
+
+        for (entry_name, entries) in matched {
+            println!("🔐 Found {} entr{} for: {}", entries.len(), if entries.len() > 1 { "ies" } else { "y" }, entry_name);
+
             for (i, entry) in entries.iter().enumerate() {
                 println!("{}. 👤 Username: {}", i + 1, entry.username);
                 if show {
@@ -86,12 +98,11 @@ impl Vault {
                     println!("   📋 Password copied to clipboard!");
                 }
             }
-        } else {
-            println!("❌ Entry not found");
         }
 
         Ok(())
     }
+
 
     pub fn list(filter: Option<&str>, sort: Option<&str>) -> Result<()> {
         let password = prompt_password("Master password: ")?;
