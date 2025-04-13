@@ -10,6 +10,7 @@ fn add_subcommand() -> Command {
         .about("Add a new password entry")
         .arg(arg!(<name> "Entry name"))
         .arg(arg!(<username> "Username"))
+        .arg(arg!(--time "Enable expired/remind input (prompt for time)"))
 }
 
 fn get_subcommand() -> Command {

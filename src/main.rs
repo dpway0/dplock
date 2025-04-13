@@ -36,7 +36,8 @@ fn handle_subcommand(cmd: &str, sub: &clap::ArgMatches) -> Result<()> {
 fn handle_add(sub: &clap::ArgMatches) -> Result<()> {
     let name = sub.get_one::<String>("name").unwrap();
     let username = sub.get_one::<String>("username").unwrap();
-    Vault::add(name, username)
+    let use_time = sub.get_flag("time");
+    Vault::add(name, username, use_time)
 }
 
 fn handle_get(sub: &clap::ArgMatches) -> Result<()> {

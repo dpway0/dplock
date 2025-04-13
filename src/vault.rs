@@ -5,16 +5,20 @@ use anyhow::{anyhow, Result};
 use arboard::Clipboard;
 use rpassword::prompt_password;
 use std::io::{self, Write};
+use chacha20poly1305::aead::generic_array::typenum::private::Trim;
+use chrono::Utc;
 use crossterm::event::{Event, KeyCode};
 use crossterm::{event};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use textwrap::wrap;
-use crate::utils::{get_terminal_width, is_encrypted};
+use crate::utils::{get_terminal_width, is_encrypted, parse_relative_time};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Entry {
     pub username: String,
     pub password: String,
+    pub expired: Option<i64>,
+    pub remind: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -31,6 +35,20 @@ impl Vault {
 
     fn prompt_master_password(prompt: &str) -> Result<String> {
         prompt_password(prompt).map_err(|e| anyhow!("Failed to read password: {e}"))
+    }
+
+    fn prompt_optional_relative_time(prompt: &str) -> Result<Option<i64>> {
+        print!("{}", prompt);
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let trimmed = input.trim();
+
+        if trimmed.is_empty() {
+            Ok(None)
+        } else {
+            parse_relative_time(trimmed).map(Some)
+        }
     }
 
     fn load_vault(password: &str) -> Result<VaultData> {
@@ -54,22 +72,35 @@ impl Vault {
         Ok(())
     }
 
-    pub fn add(name: &str, username: &str) -> Result<()> {
+    pub fn add(name: &str, username: &str, use_time: bool) -> Result<()> {
         let master = Self::prompt_master_password("🔐 Master password: ")?;
-        let entry_pass = Self::prompt_master_password("🔑 Entry password: ")?;
+        let entry_pass = Self::prompt_master_password(format!("🔑 '{username}' password: ").as_str())?;
         let mut data = Self::load_vault(&master)?;
+
+        let mut expired = None;
+        let mut remind = None;
+
+        if use_time {
+            expired = Self::prompt_optional_relative_time("⌛ Expired (e.g: 8h, 3d, 1w, 2m, 3y) or leave blank: ")?;
+
+
+            remind = Self::prompt_optional_relative_time("🔔 Remind before (e.g: 8h, 3d, 1w, 2m, 3y) or leave blank: ")?;
+
+        }
 
         let entry = Entry {
             username: username.to_string(),
             password: entry_pass,
+            expired,
+            remind,
         };
 
         data.entries.entry(name.to_string()).or_default().push(entry);
-
         Self::save_vault(&data, &master)?;
         println!("✅ Entry added under: {}", name);
         Ok(())
     }
+
 
     pub fn get(name: &str, show: bool) -> Result<()> {
         let password = Self::prompt_master_password("Master password: ")?;
@@ -86,11 +117,32 @@ impl Vault {
             return Ok(());
         }
 
+        let now = Utc::now().timestamp();
+
         for (entry_name, entries) in matched {
             println!("🔐 Found {} entr{} for: {}", entries.len(), if entries.len() > 1 { "ies" } else { "y" }, entry_name);
 
             for (i, entry) in entries.iter().enumerate() {
                 println!("{}. 👤 Username: {}", i + 1, entry.username);
+
+                if let Some(exp) = entry.expired {
+                    let now = Utc::now().timestamp();
+                    let diff = exp - now;
+
+                    if diff <= 0 {
+                        println!("   ⚠️  Password expired {} days ago.", diff.abs() / 86400);
+                    } else {
+                        println!("   ⏰ Expires in {} day(s).", diff / 86400);
+                    }
+                }
+
+                if let Some(remind) = entry.remind {
+                    let now = Utc::now().timestamp();
+                    if remind <= now {
+                        println!("   🔔 Reminder: This password should be reviewed!");
+                    }
+                }
+
                 if show {
                     println!("   🔑 Password: {}", entry.password);
                 } else {
@@ -99,7 +151,6 @@ impl Vault {
                 }
             }
         }
-
         Ok(())
     }
 
