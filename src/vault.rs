@@ -5,7 +5,7 @@ use anyhow::{anyhow, Result};
 use arboard::Clipboard;
 use rpassword::prompt_password;
 use std::io::{self, Write};
-use chrono::Utc;
+use chrono::{Utc};
 use crossterm::event::{Event, KeyCode};
 use crossterm::{event};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
@@ -18,8 +18,13 @@ pub struct Entry {
     pub password: String,
     pub expired: Option<i64>,
     pub remind: Option<i64>,
+    #[serde(default = "default_timestamp")]
+    pub created_at: i64,
 }
 
+fn default_timestamp() -> i64 {
+    Utc::now().timestamp()
+}
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct VaultData {
     pub entries: HashMap<String, Vec<Entry>>,
@@ -106,6 +111,7 @@ impl Vault {
             password: entry_pass,
             expired,
             remind,
+            created_at: Utc::now().timestamp(),
         };
 
         data.entries.entry(name.to_string()).or_default().push(entry);
@@ -268,26 +274,28 @@ impl Vault {
         let page_size = 3;
 
         for (i, (name, entry)) in entries.iter().enumerate() {
-            let line = format!("• {} (👤 {})", name, entry.username);
+            let mut expired_noti = String::new();
+            let mut remind_noti= String::new();
 
             if let Some(exp) = entry.expired {
                 let now = Utc::now().timestamp();
                 let diff = exp - now;
                 if diff <= 0 {
-                    println!("   ⚠️  Password expired {} day(s) ago.", diff.abs() / 86400);
+                    expired_noti = format!("\n   ⚠️  Password expired {} day(s) ago.", diff.abs() / 86400);
                 } else {
-                    println!("   ⏰ Expires in {} day(s).", diff / 86400);
+                    expired_noti = format!("\n   ⏰ Expires in {} day(s).", diff / 86400);
                 }
             }
             if let Some(remind) = entry.remind {
                 let now = Utc::now().timestamp();
                 if remind <= now {
-                    println!("   🔔 Reminder: This password should be reviewed!");
+                    remind_noti = "\n   🔔 Reminder: This password should be reviewed!".to_string();
                 } else {
                     let diff = remind - now;
-                    println!("   🔔 Reminder in {} day(s).", diff / 86400);
+                    remind_noti = format!("\n   🔔 Reminder in {} day(s).", diff / 86400);
                 }
             }
+            let line = format!("• {} (👤 {}){}{}", name, entry.username, expired_noti, remind_noti);
 
             for wrapped in wrap(&line, term_width) {
                 println!("{}", wrapped);
