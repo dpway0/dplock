@@ -10,7 +10,7 @@ use crossterm::event::{Event, KeyCode};
 use crossterm::{event};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use textwrap::wrap;
-use crate::utils::{get_terminal_width, is_encrypted, parse_relative_time};
+use crate::utils::{get_terminal_width, is_encrypted, parse_expired_time, parse_remind_time};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Entry {
@@ -36,7 +36,7 @@ impl Vault {
         prompt_password(prompt).map_err(|e| anyhow!("Failed to read password: {e}"))
     }
 
-    fn prompt_optional_relative_time(prompt: &str) -> Result<Option<i64>> {
+    fn prompt_optional_expired_time(prompt: &str) -> Result<Option<i64>> {
         print!("{}", prompt);
         io::stdout().flush()?;
         let mut input = String::new();
@@ -46,7 +46,21 @@ impl Vault {
         if trimmed.is_empty() {
             Ok(None)
         } else {
-            parse_relative_time(trimmed).map(Some)
+            parse_expired_time(trimmed).map(Some)
+        }
+    }
+
+    fn prompt_optional_remind_time( expired: Option<i64>, prompt: &str) -> Result<Option<i64>> {
+        print!("{}", prompt);
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let trimmed = input.trim();
+
+        if trimmed.is_empty() {
+            Ok(None)
+        } else {
+            parse_remind_time(expired, trimmed).map(Some)
         }
     }
 
@@ -80,10 +94,10 @@ impl Vault {
         let mut remind = None;
 
         if use_time {
-            expired = Self::prompt_optional_relative_time("⌛ Expired (e.g: 8h, 3d, 1w, 2m, 3y) or leave blank: ")?;
+            expired = Self::prompt_optional_expired_time("⌛ Expired (e.g: 8h, 3d, 1w, 2m, 3y) or leave blank: ")?;
 
 
-            remind = Self::prompt_optional_relative_time("🔔 Remind before (e.g: 8h, 3d, 1w, 2m, 3y) or leave blank: ")?;
+            remind = Self::prompt_optional_remind_time(expired, "🔔 Remind before (e.g: 8h, 3d, 1w, 2m, 3y) or leave blank: ")?;
 
         }
 
@@ -254,15 +268,24 @@ impl Vault {
         let page_size = 3;
 
         for (i, (name, entry)) in entries.iter().enumerate() {
-            let mut line = format!("• {} (👤 {})", name, entry.username);
+            let line = format!("• {} (👤 {})", name, entry.username);
 
             if let Some(exp) = entry.expired {
                 let now = Utc::now().timestamp();
                 let diff = exp - now;
                 if diff <= 0 {
-                    line.push_str(&format!(" ⚠️ Expired {}d ago", diff.abs() / 86400));
+                    println!("   ⚠️  Password expired {} day(s) ago.", diff.abs() / 86400);
                 } else {
-                    line.push_str(&format!(" ⏰ {}d left", diff / 86400));
+                    println!("   ⏰ Expires in {} day(s).", diff / 86400);
+                }
+            }
+            if let Some(remind) = entry.remind {
+                let now = Utc::now().timestamp();
+                if remind <= now {
+                    println!("   🔔 Reminder: This password should be reviewed!");
+                } else {
+                    let diff = remind - now;
+                    println!("   🔔 Reminder in {} day(s).", diff / 86400);
                 }
             }
 
@@ -388,6 +411,10 @@ impl Vault {
             println!("   📋 Password copied to clipboard!");
         }
 
+        Ok(())
+    }
+    pub fn check_reminders() -> Result<()> {
+        println!("💡 Check reminder: this feature is under development and will be available soon!");
         Ok(())
     }
 }

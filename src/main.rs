@@ -26,6 +26,7 @@ fn handle_subcommand(cmd: &str, sub: &clap::ArgMatches) -> Result<()> {
         "remove" => handle_remove(sub)?,
         "export" => handle_export(sub)?,
         "import" => handle_import(sub)?,
+        "check-reminders" => Vault::check_reminders()?,
         _ => {
             println!("❌ Unknown command: {}", cmd);
         }

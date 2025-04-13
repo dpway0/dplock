@@ -49,6 +49,10 @@ fn import_subcommand() -> Command {
         .arg(arg!(--plain "Import passwords as plain text (⚠️ unsafe)"))
 }
 
+fn check_reminders_subcommand() -> Command {
+    Command::new("check-reminders")
+        .about("Check all entries and notify if any password is due for review (remind date reached)")
+}
 
 pub fn build_cli() -> Command {
     Command::new("dplock")
@@ -60,4 +64,5 @@ pub fn build_cli() -> Command {
         .subcommand(remove_subcommand())
         .subcommand(export_subcommand())
         .subcommand(import_subcommand())
+        .subcommand(check_reminders_subcommand())
 }
