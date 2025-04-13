@@ -43,8 +43,10 @@ fn handle_add(sub: &clap::ArgMatches) -> Result<()> {
 
 fn handle_get(sub: &clap::ArgMatches) -> Result<()> {
     let name = sub.get_one::<String>("name").unwrap();
+    let username = sub.get_one::<String>("username").map(String::as_str);
+
     let show = sub.get_flag("show");
-    Vault::get(name, show)
+    Vault::get(name, username, show)
 }
 
 fn handle_list(sub: &clap::ArgMatches) -> Result<()> {

@@ -17,6 +17,7 @@ fn get_subcommand() -> Command {
     Command::new("get")
         .about("Get a password by name")
         .arg(arg!(<name> "Entry name"))
+        .arg(arg!(<username> "Username").required(false))
         .arg(arg!(--show "Print password instead of copying"))
 }
 

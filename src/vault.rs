@@ -121,7 +121,7 @@ impl Vault {
     }
 
 
-    pub fn get(name: &str, show: bool) -> Result<()> {
+    pub fn get(name: &str, username: Option<&str>, show: bool) -> Result<()> {
         let password = Self::prompt_master_password("Master password: ")?;
         let data = Self::load_vault(&password)?;
 
@@ -137,9 +137,20 @@ impl Vault {
         }
 
         for (entry_name, entries) in matched {
-            println!("🔐 Found {} entr{} for: {}", entries.len(), if entries.len() > 1 { "ies" } else { "y" }, entry_name);
+            let filtered_entries: Vec<_> = if let Some(username) = username {
+                entries.iter().filter(|entry| entry.username.contains(username)).collect()
+            } else {
+                entries.iter().collect()
+            };
 
-            for (i, entry) in entries.iter().enumerate() {
+            if filtered_entries.is_empty() {
+                println!("❌ No entries found matching username '{}' under '{}'", username.unwrap_or(""), entry_name);
+                continue;
+            }
+
+            println!("🔐 Found {} entr{} for: {}", filtered_entries.len(), if filtered_entries.len() > 1 { "ies" } else { "y" }, entry_name);
+
+            for (i, entry) in filtered_entries.iter().enumerate() {
                 Self::print_entry_info(entry, i, show)?;
             }
         }
