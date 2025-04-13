@@ -5,7 +5,6 @@ use anyhow::{anyhow, Result};
 use arboard::Clipboard;
 use rpassword::prompt_password;
 use std::io::{self, Write};
-use chacha20poly1305::aead::generic_array::typenum::private::Trim;
 use chrono::Utc;
 use crossterm::event::{Event, KeyCode};
 use crossterm::{event};
@@ -117,38 +116,11 @@ impl Vault {
             return Ok(());
         }
 
-        let now = Utc::now().timestamp();
-
         for (entry_name, entries) in matched {
             println!("🔐 Found {} entr{} for: {}", entries.len(), if entries.len() > 1 { "ies" } else { "y" }, entry_name);
 
             for (i, entry) in entries.iter().enumerate() {
-                println!("{}. 👤 Username: {}", i + 1, entry.username);
-
-                if let Some(exp) = entry.expired {
-                    let now = Utc::now().timestamp();
-                    let diff = exp - now;
-
-                    if diff <= 0 {
-                        println!("   ⚠️  Password expired {} days ago.", diff.abs() / 86400);
-                    } else {
-                        println!("   ⏰ Expires in {} day(s).", diff / 86400);
-                    }
-                }
-
-                if let Some(remind) = entry.remind {
-                    let now = Utc::now().timestamp();
-                    if remind <= now {
-                        println!("   🔔 Reminder: This password should be reviewed!");
-                    }
-                }
-
-                if show {
-                    println!("   🔑 Password: {}", entry.password);
-                } else {
-                    Self::copy_to_clipboard(&entry.password)?;
-                    println!("   📋 Password copied to clipboard!");
-                }
+                Self::print_entry_info(entry, i, show)?;
             }
         }
         Ok(())
@@ -282,7 +254,18 @@ impl Vault {
         let page_size = 3;
 
         for (i, (name, entry)) in entries.iter().enumerate() {
-            let line = format!("• {} (👤 {})", name, entry.username);
+            let mut line = format!("• {} (👤 {})", name, entry.username);
+
+            if let Some(exp) = entry.expired {
+                let now = Utc::now().timestamp();
+                let diff = exp - now;
+                if diff <= 0 {
+                    line.push_str(&format!(" ⚠️ Expired {}d ago", diff.abs() / 86400));
+                } else {
+                    line.push_str(&format!(" ⏰ {}d left", diff / 86400));
+                }
+            }
+
             for wrapped in wrap(&line, term_width) {
                 println!("{}", wrapped);
             }
@@ -311,6 +294,7 @@ impl Vault {
 
         Ok(())
     }
+
 
     pub fn export(path: &str, plain: bool) -> Result<()> {
         let master = Self::prompt_master_password("🔐 Master password: ")?;
@@ -371,6 +355,39 @@ impl Vault {
 
         Self::save_vault(&current_data, &master)?;
         println!("✅ Vault imported and merged successfully.");
+        Ok(())
+    }
+    fn print_entry_info(entry: &Entry, index: usize, show_password: bool) -> Result<()> {
+        println!("{}. 👤 Username: {}", index + 1, entry.username);
+
+        if let Some(exp) = entry.expired {
+            let now = Utc::now().timestamp();
+            let diff = exp - now;
+
+            if diff <= 0 {
+                println!("   ⚠️  Password expired {} day(s) ago.", diff.abs() / 86400);
+            } else {
+                println!("   ⏰ Expires in {} day(s).", diff / 86400);
+            }
+        }
+
+        if let Some(remind) = entry.remind {
+            let now = Utc::now().timestamp();
+            if remind <= now {
+                println!("   🔔 Reminder: This password should be reviewed!");
+            } else {
+                let diff = remind - now;
+                println!("   🔔 Reminder in {} day(s).", diff / 86400);
+            }
+        }
+
+        if show_password {
+            println!("   🔑 Password: {}", entry.password);
+        } else {
+            Self::copy_to_clipboard(&entry.password)?;
+            println!("   📋 Password copied to clipboard!");
+        }
+
         Ok(())
     }
 }

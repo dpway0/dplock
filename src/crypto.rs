@@ -8,6 +8,7 @@ use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use rand::{rngs::OsRng, RngCore};
 use serde::{Serialize, de::DeserializeOwned};
 use bincode::{serialize, deserialize};
+use base64::{engine::general_purpose};
 
 pub fn encrypt<T: Serialize>(data: &T, password: &str) -> Result<Vec<u8>> {
     let serialized = serialize(data)?;
@@ -67,11 +68,11 @@ fn derive_key(password: &str, salt: &[u8]) -> Result<Key> {
 
 pub fn encrypt_entry(password: &str, master: &str) -> Result<String> {
     let encrypted = encrypt(&password, master)?;
-    Ok(base64::encode(&encrypted))
+    Ok(general_purpose::STANDARD.encode(&encrypted))
 }
 
 pub fn decrypt_entry(encoded: &str, master: &str) -> Result<String> {
-    let bytes = base64::decode(encoded)?;
+    let bytes = general_purpose::STANDARD.decode(encoded)?;
     let decrypted: String = decrypt(&bytes, master)?;
     Ok(decrypted)
 }
