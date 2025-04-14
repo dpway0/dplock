@@ -12,6 +12,10 @@
   - `add` – Add a new entry with a name and username.
   - `get` – Retrieve an entry by name (optionally print the password with `--show`).
   - `list` – List all saved entries with optional filters and sorting.
+  - `remove` – Remove a password entry by name (optionally specify an index).
+  - `export` – Export the vault to a JSON file for backup or migration purposes.
+  - `import` – Import a vault from a JSON file.
+  - `check-reminders` – Check and notify if any password is due for review (remind date reached).
   - **Utility**: Clear the terminal screen for better readability.
 
 ## 🧪 Quick Demo
@@ -42,7 +46,27 @@ $ dplock list --filter git --sort name
 ### Requirements
 
 - **Rust**: Version 1.86 or newer.
-- **Supported Platforms**: Linux, macOS, Windows.
+- **Supported Platforms**: Linux, macOS
+
+### Prebuilt binaries
+
+🏁 Ubuntu
+
+Download the .deb package for easy installation:
+
+Download [dplock_0.1.0-1_amd64.deb](https://github.com/dpway0/dplock/releases/latest/download/dplock_0.1.0-1_amd64.deb) and install:
+```
+sudo dpkg -i dplock_0.1.0-1_amd64.deb
+```
+
+🍏 macOS
+
+Download the binary from [Releases](https://github.com/dpway0/dplock/releases), then:
+
+```
+chmod +x dplock-0.1.0-x86_64-macos 
+mv dplock-0.1.0-x86_64-macos /usr/local/bin/dplock
+```
 
 ### Build from Source
 
@@ -73,20 +97,22 @@ dplock init
 Add a new password entry.
 
 ```bash
-dplock add <name> <username>
+dplock add <name> <username> [--time]
 ```
 
 - `<name>`: The name of the entry (e.g., "github").
 - `<username>`: The username associated with the entry.
+- `--time`: Enable expired/remind input (prompt for time).
 
 ### `get`
 Retrieve a password by name.
 
 ```bash
-dplock get <name> [--show]
+dplock get <name> [<username>] [--show]
 ```
 
 - `<name>`: The name of the entry to retrieve.
+- `<username>` (optional): The username associated with the entry.
 - `--show`: Print the password instead of copying it to the clipboard.
 
 ### `list`
@@ -99,11 +125,41 @@ dplock list [--filter <KEY>] [--sort <FIELD>]
 - `--filter <KEY>`: Filter entries by name or username.
 - `--sort <FIELD>`: Sort entries by `name` or `username`.
 
-### `clear`
-Clear the terminal screen.
+### `remove`
+Remove a password entry by name.
 
 ```bash
-dplock clear
+dplock remove <name> [--index <INDEX>]
+```
+
+- `<name>`: The name of the entry to remove.
+- `--index <INDEX>`: Specify the index of the entry to remove (starts from 1).
+
+### `export`
+Export the vault to a JSON file (unencrypted).
+
+```bash
+dplock export <path> [--plain]
+```
+
+- `<path>`: The path to export the JSON file.
+- `--plain`: Export passwords as plain text (⚠️ unsafe).
+
+### `import`
+Import a vault from a JSON file.
+
+```bash
+dplock import <path> [--plain]
+```
+
+- `<path>`: The path to the JSON file to import.
+- `--plain`: Import passwords as plain text (⚠️ unsafe).
+
+### `check-reminders`
+Check all entries and notify if any password is due for review (remind date reached).
+
+```bash
+dplock check-reminders
 ```
 
 ## 🤝 Contributing
@@ -127,12 +183,12 @@ Contributions are welcome! Feel free to:
    cargo test
    ```
 
----
-
 ## 💖 Support This Project
 
 If you like `dplock` and want to support development, you can donate via PayPal:
 
 👉 [Donate via PayPal](https://paypal.me/zifuong)
+
+---
 
 Made with ❤️ in Rust.

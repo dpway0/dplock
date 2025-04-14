@@ -2,6 +2,9 @@
 name = "dplock"
 version = "0.1.0"
 edition = "2021"
+authors = ["dpway <dpway0@gmail.com>"]
+description = "Minimal password manager — offline and secure"
+license = "MIT"
 
 [dependencies]
 anyhow = "1.0"
@@ -23,3 +26,9 @@ terminal_size = "0.4.2"
 textwrap = "0.16.2"
 regex = "1.11.1"
 chrono = "0.4.40"
+
+[package.metadata.deb]
+copyright = "2025 dpway"
+maintainer = "dpway <dpway0@gmail.com>"
+section = "utils"
+priority = "optional"
