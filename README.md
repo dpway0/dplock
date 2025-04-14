@@ -129,4 +129,10 @@ Contributions are welcome! Feel free to:
 
 ---
 
+## 💖 Support This Project
+
+If you like `dplock` and want to support development, you can donate via PayPal:
+
+👉 [Donate via PayPal](https://paypal.me/zifuong)
+
 Made with ❤️ in Rust.
