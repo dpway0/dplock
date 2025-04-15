@@ -10,8 +10,8 @@ fn add_subcommand() -> Command {
         .about("Add a new password entry")
         .arg(arg!(<name> "Entry name"))
         .arg(arg!(<username> "Username"))
-        .arg(arg!(--time "Enable expired/remind input (prompt for time)"))
-        .arg(arg!(--message <MESSAGE> "Optional message or note for the entry"))
+        .arg(arg!(-t --time "Enable expired/remind input (prompt for time)"))
+        .arg(arg!(-m --message <MESSAGE> "Optional message or note for the entry"))
 }
 
 fn get_subcommand() -> Command {
@@ -19,28 +19,28 @@ fn get_subcommand() -> Command {
         .about("Get a password by name")
         .arg(arg!(<name> "Entry name"))
         .arg(arg!(<username> "Username").required(false))
-        .arg(arg!(--show "Print password instead of copying"))
+        .arg(arg!(-S --show "Print password instead of copying"))
 }
 
 fn list_subcommand() -> Command {
     Command::new("list")
         .about("List all saved entries")
-        .arg(arg!(--filter <KEY> "Filter entries by name or username"))
-        .arg(arg!(--sort <FIELD> "Sort by 'name' or 'username'"))
+        .arg(arg!(-f --filter <KEY> "Filter entries by name or username"))
+        .arg(arg!(-s --sort <FIELD> "Sort by 'name' or 'username'"))
 }
 
 fn remove_subcommand() -> Command {
     Command::new("remove")
         .about("Remove password entry by name (optional: specify --index to remove one entry)")
         .arg(arg!(<name> "Entry name to remove"))
-        .arg(arg!(--index <INDEX> "Specify the index of the entry to remove (starts from 1)"))
+        .arg(arg!(-i --index <INDEX> "Specify the index of the entry to remove (starts from 1)"))
 }
 fn export_subcommand() -> Command {
     Command::new("export")
         .about("Export vault to a JSON file (unencrypted)")
         .arg(arg!(<path> "Path to export the JSON file"))
         .arg(
-            arg!(--plain "Export passwords as plain text (⚠️ unsafe)"),
+            arg!(-p --plain "Export passwords as plain text (⚠️ unsafe)"),
         )
 }
 
@@ -48,7 +48,7 @@ fn import_subcommand() -> Command {
     Command::new("import")
         .about("Import vault from a JSON file")
         .arg(arg!(<path> "Path to the JSON file to import"))
-        .arg(arg!(--plain "Import passwords as plain text (⚠️ unsafe)"))
+        .arg(arg!(-p --plain "Import passwords as plain text (⚠️ unsafe)"))
 }
 
 fn check_reminders_subcommand() -> Command {
