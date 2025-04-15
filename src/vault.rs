@@ -32,11 +32,20 @@ pub struct VaultData {
     pub entries: HashMap<String, Vec<Entry>>,
 }
 
-pub struct Vault;
+pub struct Vault {
+    vault_file: PathBuf,
+}
 
 impl Vault {
-    fn vault_path() -> PathBuf {
-        dirs::home_dir().unwrap().join(".dplock/vault.bin")
+    pub fn new(vault_file: Option<PathBuf>) -> Self {
+        let vault_file = vault_file.unwrap_or_else(|| {
+            dirs::home_dir().unwrap().join(".dplock/vault.bin")
+        });
+        Self { vault_file }
+    }
+
+    fn vault_path(&self) -> &PathBuf {
+        &self.vault_file
     }
 
     fn prompt_master_password(prompt: &str) -> Result<String> {
@@ -71,31 +80,31 @@ impl Vault {
         }
     }
 
-    fn load_vault(password: &str) -> Result<VaultData> {
-        let bytes = fs::read(Self::vault_path())?;
+    fn load_vault(&self, password: &str) -> Result<VaultData> {
+        let bytes = fs::read(self.vault_path())?;
         crypto::decrypt(&bytes, password)
     }
 
-    pub fn init() -> Result<()> {
-        let path = Self::vault_path();
+    pub fn init(&self) -> Result<()> {
+        let path = self.vault_path();
         if path.exists() {
             println!("⚠️  Vault already exists at: {}", path.display());
-            if !Self::confirm_overwrite()? {
+            if !Self::confirm_overwrite(path)? {
                 println!("❌ Initialization cancelled.");
                 return Ok(());
             }
         }
 
         let new_password = prompt_password("Set new master password: ")?;
-        Self::save_vault(&VaultData::default(), &new_password)?;
+        Self::save_vault(path, &VaultData::default(), &new_password)?;
         println!("🔐 Vault initialized!");
         Ok(())
     }
 
-    pub fn add(name: &str, username: &str, use_time: bool, message: Option<&str>) -> Result<()> {
+    pub fn add(&self, name: &str, username: &str, use_time: bool, message: Option<&str>) -> Result<()> {
         let master = Self::prompt_master_password("🔐 Master password: ")?;
         let entry_pass = Self::prompt_master_password(format!("🔑 '{username}' password: ").as_str())?;
-        let mut data = Self::load_vault(&master)?;
+        let mut data = self.load_vault(&master)?;
 
         let mut expired = None;
         let mut remind = None;
@@ -115,15 +124,15 @@ impl Vault {
         };
 
         data.entries.entry(name.to_string()).or_default().push(entry);
-        Self::save_vault(&data, &master)?;
+        Self::save_vault(self.vault_path(), &data, &master)?;
         println!("✅ Entry added under: {}", name);
         Ok(())
     }
 
 
-    pub fn get(name: &str, username: Option<&str>, show: bool) -> Result<()> {
+    pub fn get(&self, name: &str, username: Option<&str>, show: bool) -> Result<()> {
         let password = Self::prompt_master_password("Master password: ")?;
-        let data = Self::load_vault(&password)?;
+        let data = self.load_vault(&password)?;
 
         let regex = regex::Regex::new(name).map_err(|e| anyhow!("Invalid regex: {e}"))?;
 
@@ -158,9 +167,9 @@ impl Vault {
     }
 
 
-    pub fn list(filter: Option<&str>, sort: Option<&str>) -> Result<()> {
+    pub fn list(&self, filter: Option<&str>, sort: Option<&str>) -> Result<()> {
         let password = prompt_password("Master password: ")?;
-        let data = Self::load(&password)?;
+        let data = self.load_vault(&password)?;
 
         let mut entries: Vec<_> = data.entries.iter().flat_map(|(name, entry_list)| {
             entry_list.iter().map(move |entry| (name, entry))
@@ -178,9 +187,9 @@ impl Vault {
         Ok(())
     }
 
-    pub fn remove(name: &str, index: Option<usize>) -> Result<()> {
+    pub fn remove(&self, name: &str, index: Option<usize>) -> Result<()> {
         let master = Self::prompt_master_password("🔐 Master password: ")?;
-        let mut data = Self::load_vault(&master)?;
+        let mut data = self.load_vault(&master)?;
 
         match data.entries.get_mut(name) {
             Some(entry_list) => {
@@ -212,7 +221,7 @@ impl Vault {
                     println!("🗑️ All entries under '{}' removed.", name);
                 }
 
-                Self::save_vault(&data, &master)?;
+                Self::save_vault(self.vault_path(), &data, &master)?;
             }
             None => {
                 println!("❌ Entry name not found.");
@@ -222,27 +231,27 @@ impl Vault {
         Ok(())
     }
 
-    fn load(password: &str) -> Result<VaultData> {
-        let bytes = fs::read(Self::vault_path())?;
+    fn load(path: &PathBuf, password: &str) -> Result<VaultData> {
+        let bytes = fs::read(path)?;
         let data: VaultData = crypto::decrypt(&bytes, password)?;
         Ok(data)
     }
 
-    fn save_vault(data: &VaultData, password: &str) -> Result<()> {
+    fn save_vault(path: &PathBuf, data: &VaultData, password: &str) -> Result<()> {
         let encrypted = crypto::encrypt(data, password)?;
-        fs::create_dir_all(Self::vault_path().parent().unwrap())?;
-        fs::write(Self::vault_path(), encrypted)?;
+        fs::create_dir_all(path.parent().unwrap())?;
+        fs::write(path, encrypted)?;
         Ok(())
     }
 
-    fn confirm_overwrite() -> Result<bool> {
+    fn confirm_overwrite(path: &PathBuf) -> Result<bool> {
         let confirm = prompt_password("Do you want to overwrite it? Type 'yes' to confirm: ")?;
         if confirm.trim() != "yes" {
             return Ok(false);
         }
 
         let old_password = prompt_password("Enter current master password: ")?;
-        match Self::load(&old_password) {
+        match Self::load(path, &old_password) {
             Ok(_) => {
                 println!("✅ Password confirmed.");
                 Ok(true)
@@ -343,9 +352,9 @@ impl Vault {
     }
 
 
-    pub fn export(path: &str, plain: bool) -> Result<()> {
+    pub fn export(&self, path: &str, plain: bool) -> Result<()> {
         let master = Self::prompt_master_password("🔐 Master password: ")?;
-        let data = Self::load_vault(&master)?;
+        let data = self.load_vault(&master)?;
 
         if plain {
             let json = serde_json::to_string_pretty(&data)?;
@@ -368,7 +377,7 @@ impl Vault {
         Ok(())
     }
 
-    pub fn import(path: &str, plain: bool) -> Result<()> {
+    pub fn import(&self, path: &str, plain: bool) -> Result<()> {
         let json = std::fs::read(path)?;
 
         if is_encrypted(&json) && plain {
@@ -383,7 +392,7 @@ impl Vault {
         let imported_data: VaultData = serde_json::from_slice(&json)?;
 
         let master = Self::prompt_master_password("🔐 Master password: ")?;
-        let mut current_data = Self::load_vault(&master)?;
+        let mut current_data = self.load_vault(&master)?;
 
         for (name, new_entries) in imported_data.entries {
             let entry_list = current_data.entries.entry(name).or_default();
@@ -400,7 +409,7 @@ impl Vault {
             }
         }
 
-        Self::save_vault(&current_data, &master)?;
+        Self::save_vault(self.vault_path(), &current_data, &master)?;
         println!("✅ Vault imported and merged successfully.");
         Ok(())
     }
@@ -441,7 +450,7 @@ impl Vault {
 
         Ok(())
     }
-    pub fn check_reminders() -> Result<()> {
+    pub fn check_reminders(&self) -> Result<()> {
         println!("💡 Check reminder: this feature is under development and will be available soon!");
         Ok(())
     }

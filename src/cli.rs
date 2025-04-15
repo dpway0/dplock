@@ -59,6 +59,7 @@ fn check_reminders_subcommand() -> Command {
 pub fn build_cli() -> Command {
     Command::new("dplock")
         .about("Minimal password manager — offline and secure")
+        .arg(arg!(-v --vault <VAULT> "Specify the vault file path").global(true))
         .subcommand(init_subcommand())
         .subcommand(add_subcommand())
         .subcommand(get_subcommand())
