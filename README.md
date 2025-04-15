@@ -56,7 +56,7 @@ Download the .deb package for easy installation:
 
 Download [dplock_0.1.0-1_amd64.deb](https://github.com/dpway0/dplock/releases/latest/download/dplock_0.1.0-1_amd64.deb) and install:
 ```
-sudo dpkg -i dplock_0.1.0-1_amd64.deb
+sudo dpkg -i dplock_0.2.0-1_amd64.deb
 ```
 
 🍏 macOS
@@ -64,8 +64,14 @@ sudo dpkg -i dplock_0.1.0-1_amd64.deb
 Download the binary from [Releases](https://github.com/dpway0/dplock/releases), then:
 
 ```
-chmod +x dplock-0.1.0-x86_64-macos 
-mv dplock-0.1.0-x86_64-macos /usr/local/bin/dplock
+# For Intel-based Macs
+chmod +x dplock-0.2.0-x86_64-macos 
+mv dplock-0.2.0-x86_64-macos /usr/local/bin/dplock
+
+# For Apple Silicon (M1/M2/M3)
+chmod +x dplock-0.2.0-aarch64-macos
+sudo mv dplock-0.2.0-aarch64-macos /usr/local/bin/dplock
+
 ```
 
 ### Build from Source
