@@ -11,6 +11,7 @@ fn add_subcommand() -> Command {
         .arg(arg!(<name> "Entry name"))
         .arg(arg!(<username> "Username"))
         .arg(arg!(--time "Enable expired/remind input (prompt for time)"))
+        .arg(arg!(--message <MESSAGE> "Optional message or note for the entry"))
 }
 
 fn get_subcommand() -> Command {

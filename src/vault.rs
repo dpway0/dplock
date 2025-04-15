@@ -20,6 +20,8 @@ pub struct Entry {
     pub remind: Option<i64>,
     #[serde(default = "default_timestamp")]
     pub created_at: i64,
+    #[serde(default)]
+    pub message: Option<String>,
 }
 
 fn default_timestamp() -> i64 {
@@ -90,7 +92,7 @@ impl Vault {
         Ok(())
     }
 
-    pub fn add(name: &str, username: &str, use_time: bool) -> Result<()> {
+    pub fn add(name: &str, username: &str, use_time: bool, message: Option<&str>) -> Result<()> {
         let master = Self::prompt_master_password("🔐 Master password: ")?;
         let entry_pass = Self::prompt_master_password(format!("🔑 '{username}' password: ").as_str())?;
         let mut data = Self::load_vault(&master)?;
@@ -100,10 +102,7 @@ impl Vault {
 
         if use_time {
             expired = Self::prompt_optional_expired_time("⌛ Expired (e.g: 8h, 3d, 1w, 2m, 3y) or leave blank: ")?;
-
-
             remind = Self::prompt_optional_remind_time(expired, "🔔 Remind before (e.g: 8h, 3d, 1w, 2m, 3y) or leave blank: ")?;
-
         }
 
         let entry = Entry {
@@ -112,6 +111,7 @@ impl Vault {
             expired,
             remind,
             created_at: Utc::now().timestamp(),
+            message: message.map(|m| m.to_string()), // Store the message
         };
 
         data.entries.entry(name.to_string()).or_default().push(entry);
@@ -282,11 +282,12 @@ impl Vault {
 
     fn paginate_entries(entries: Vec<(&String, &Entry)>) -> Result<()> {
         let term_width = get_terminal_width().saturating_sub(2);
-        let page_size = 3;
+        let page_size = 10;
 
         for (i, (name, entry)) in entries.iter().enumerate() {
             let mut expired_noti = String::new();
             let mut remind_noti= String::new();
+            let mut message= String::new();
 
             if let Some(exp) = entry.expired {
                 let now = Utc::now().timestamp();
@@ -306,7 +307,11 @@ impl Vault {
                     remind_noti = format!("\n   🔔 Reminder in {} day(s).", diff / 86400);
                 }
             }
-            let line = format!("• {} (👤 {}){}{}", name, entry.username, expired_noti, remind_noti);
+            if let Some(msg) = &entry.message {
+                message = format!("\n   📝 Message: {}", msg);
+            }
+            
+            let line = format!("• {} (👤 {}){}{}{}", name, entry.username, expired_noti, remind_noti, message);
 
             for wrapped in wrap(&line, term_width) {
                 println!("{}", wrapped);
@@ -421,6 +426,10 @@ impl Vault {
                 let diff = remind - now;
                 println!("   🔔 Reminder in {} day(s).", diff / 86400);
             }
+        }
+
+        if let Some(message) = &entry.message {
+            println!("   📝 Message: {}", message);
         }
 
         if show_password {

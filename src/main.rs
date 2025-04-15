@@ -38,7 +38,8 @@ fn handle_add(sub: &clap::ArgMatches) -> Result<()> {
     let name = sub.get_one::<String>("name").unwrap();
     let username = sub.get_one::<String>("username").unwrap();
     let use_time = sub.get_flag("time");
-    Vault::add(name, username, use_time)
+    let message = sub.get_one::<String>("message").map(String::as_str);
+    Vault::add(name, username, use_time, message)
 }
 
 fn handle_get(sub: &clap::ArgMatches) -> Result<()> {
