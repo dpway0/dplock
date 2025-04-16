@@ -391,28 +391,40 @@ impl Vault {
 
         let imported_data: VaultData = serde_json::from_slice(&json)?;
 
-        let master = Self::prompt_master_password("🔐 Master password: ")?;
-        let mut current_data = self.load_vault(&master)?;
+        let source_master = if !plain && is_encrypted(&json) {
+            Self::prompt_master_password("🔐 Source vault master password: ")?
+        } else {
+            String::new()
+        };
+
+        let target_vault_path = self.vault_path().clone();
+
+        let target_master = Self::prompt_master_password("🔐 Target vault master password: ")?;
+
+        let mut current_data = Self::load(&target_vault_path, &target_master)?;
 
         for (name, new_entries) in imported_data.entries {
-            let entry_list = current_data.entries.entry(name).or_default();
+            let entry_list = current_data.entries.entry(name.clone()).or_default();
             for mut new_entry in new_entries {
                 if !plain {
-                    new_entry.password = crypto::decrypt_entry(&new_entry.password, &master)?;
+                    new_entry.password = crypto::decrypt_entry(&new_entry.password, &source_master)?;
                 }
-                let is_duplicate = entry_list.iter().any(|e|
-                e.username == new_entry.username && e.password == new_entry.password
-                );
+                let is_duplicate = entry_list.iter().any(|e| {
+                    e.username == new_entry.username && e.password == new_entry.password
+                });
                 if !is_duplicate {
                     entry_list.push(new_entry);
+                } else {
+                    println!("⚠️  Duplicate entry skipped: {} / {}", name, new_entry.username);
                 }
             }
         }
 
-        Self::save_vault(self.vault_path(), &current_data, &master)?;
-        println!("✅ Vault imported and merged successfully.");
+        Self::save_vault(&target_vault_path, &current_data, &target_master)?;
+        println!("✅ Vault imported and merged successfully into: {}", target_vault_path.display());
         Ok(())
     }
+
     fn print_entry_info(entry: &Entry, index: usize, show_password: bool) -> Result<()> {
         println!("{}. 👤 Username: {}", index + 1, entry.username);
 

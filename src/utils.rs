@@ -1,6 +1,9 @@
 use anyhow::anyhow;
+use base64::Engine;
 use chrono::Utc;
+use serde_json::Value;
 use terminal_size::terminal_size;
+use base64::engine::general_purpose::STANDARD as base64_engine;
 
 pub fn get_terminal_width() -> usize {
     if let Some((w, _)) = terminal_size() {
@@ -11,8 +14,36 @@ pub fn get_terminal_width() -> usize {
 }
 
 pub fn is_encrypted(data: &[u8]) -> bool {
-    data.len() > 16 + 12
+    let json: Value = match serde_json::from_slice(data) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+
+    let entries = match json.get("entries").and_then(|e| e.as_object()) {
+        Some(map) => map,
+        None => return false,
+    };
+
+    for entry_list in entries.values() {
+        if let Some(array) = entry_list.as_array() {
+            for entry in array {
+                if let Some(password_value) = entry.get("password") {
+                    if let Some(password) = password_value.as_str() {
+                        if let Ok(decoded) = base64_engine.decode(password) {
+                            if decoded.len() >= 32 {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    false
 }
+
+
 
 pub fn parse_expired_time(input: &str) -> anyhow::Result<i64> {
     let now = Utc::now().timestamp();

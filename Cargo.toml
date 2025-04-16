@@ -1,6 +1,6 @@
 [package]
 name = "dplock"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["dpway <dpway0@gmail.com>"]
 description = "Minimal password manager — offline and secure"
