@@ -11,6 +11,7 @@ use crossterm::{event};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use textwrap::wrap;
 use crate::utils::{get_terminal_width, is_encrypted, parse_expired_time, parse_remind_time};
+use std::env;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Entry {
@@ -41,16 +42,69 @@ impl Vault {
         let vault_file = vault_file.unwrap_or_else(|| {
             dirs::home_dir().unwrap().join(".dplock/vault.bin")
         });
-        Self { vault_file }
+        Self {
+            vault_file
+        }
     }
 
     fn vault_path(&self) -> &PathBuf {
         &self.vault_file
     }
 
-    fn prompt_master_password(prompt: &str) -> Result<String> {
+    fn save_master_to_keyring(&self, password: &str) -> Result<()> {
+        let service = "dplock";
+        let username = self.vault_path().to_string_lossy();
+        let entry = keyring::Entry::new(service, &username)?;
+        entry.set_password(password)?;
+        Ok(())
+    }
+    
+    fn load_master_from_keyring(&self) -> Result<Option<String>> {
+        let service = "dplock";
+        let username = self.vault_path().to_string_lossy();
+        let entry = keyring::Entry::new(service, &username)?;
+        match entry.get_password() {
+            Ok(password) => Ok(Some(password)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(e) => Err(anyhow!("Keyring error: {e}")),
+        }
+    }
+    
+    fn clear_master_from_keyring(&self) -> Result<()> {
+        let service = "dplock";
+        let username = self.vault_path().to_string_lossy();
+        let entry = keyring::Entry::new(service, &username)?;
+        let _ = entry.delete_password(); // ignore if not found
+        Ok(())
+    }
+    
+
+    fn prompt_password(prompt: &str) -> Result<String> {
         prompt_password(prompt).map_err(|e| anyhow!("Failed to read password: {e}"))
     }
+    fn get_master_password(&self, prompt: &str) -> Result<String> {
+        let cache_duration: i64 = env::var("DPLOCK_CACHE_DURATION")
+            .ok()
+            .and_then(|val| val.parse().ok())
+            .unwrap_or(600); // Default to 600 seconds if not set or invalid
+
+        if let Some(password) = self.load_master_from_keyring()? {
+            let now = Utc::now().timestamp();
+            let parts: Vec<&str> = password.splitn(2, ':').collect();
+            if parts.len() == 2 {
+                let cached_time: i64 = parts[0].parse().unwrap_or(0);
+                if now - cached_time <= cache_duration {
+                    return Ok(parts[1].to_string());
+                }
+            }
+        }
+    
+        let password = Self::prompt_password(prompt)?;
+        let now = Utc::now().timestamp();
+        self.save_master_to_keyring(&format!("{}:{}", now, password))?;
+        Ok(password)
+    }
+
 
     fn prompt_optional_expired_time(prompt: &str) -> Result<Option<i64>> {
         print!("{}", prompt);
@@ -86,6 +140,7 @@ impl Vault {
     }
 
     pub fn init(&self) -> Result<()> {
+        self.clear_master_from_keyring()?;
         let path = self.vault_path();
         if path.exists() {
             println!("⚠️  Vault already exists at: {}", path.display());
@@ -102,8 +157,8 @@ impl Vault {
     }
 
     pub fn add(&self, name: &str, username: &str, use_time: bool, message: Option<&str>) -> Result<()> {
-        let master = Self::prompt_master_password("🔐 Master password: ")?;
-        let entry_pass = Self::prompt_master_password(format!("🔑 '{username}' password: ").as_str())?;
+        let master = self.get_master_password("🔐 Master password: ")?;
+        let entry_pass = Self::prompt_password(format!("🔑 '{username}' password: ").as_str())?;
         let mut data = self.load_vault(&master)?;
 
         let mut expired = None;
@@ -131,7 +186,7 @@ impl Vault {
 
 
     pub fn get(&self, name: &str, username: Option<&str>, show: bool) -> Result<()> {
-        let password = Self::prompt_master_password("Master password: ")?;
+        let password = self.get_master_password("Master password: ")?;
         let data = self.load_vault(&password)?;
 
         let regex = regex::Regex::new(name).map_err(|e| anyhow!("Invalid regex: {e}"))?;
@@ -168,7 +223,7 @@ impl Vault {
 
 
     pub fn list(&self, filter: Option<&str>, sort: Option<&str>) -> Result<()> {
-        let password = prompt_password("Master password: ")?;
+        let password = self.get_master_password("Master password: ")?;
         let data = self.load_vault(&password)?;
 
         let mut entries: Vec<_> = data.entries.iter().flat_map(|(name, entry_list)| {
@@ -188,7 +243,7 @@ impl Vault {
     }
 
     pub fn remove(&self, name: &str, index: Option<usize>) -> Result<()> {
-        let master = Self::prompt_master_password("🔐 Master password: ")?;
+        let master = self.get_master_password("🔐 Master password: ")?;
         let mut data = self.load_vault(&master)?;
 
         match data.entries.get_mut(name) {
@@ -211,7 +266,7 @@ impl Vault {
                              if entry_list.len() > 1 { "ies" } else { "y" },
                              name);
 
-                    let confirm = Self::prompt_master_password("Type 'yes' to confirm: ")?;
+                    let confirm = Self::prompt_password("Type 'yes' to confirm: ")?;
                     if confirm.trim() != "yes" {
                         println!("❌ Cancelled.");
                         return Ok(());
@@ -353,7 +408,7 @@ impl Vault {
 
 
     pub fn export(&self, path: &str, plain: bool) -> Result<()> {
-        let master = Self::prompt_master_password("🔐 Master password: ")?;
+        let master = Self::prompt_password("🔐 Master password: ")?;
         let data = self.load_vault(&master)?;
 
         if plain {
@@ -392,14 +447,14 @@ impl Vault {
         let imported_data: VaultData = serde_json::from_slice(&json)?;
 
         let source_master = if !plain && is_encrypted(&json) {
-            Self::prompt_master_password("🔐 Source vault master password: ")?
+            Self::prompt_password("🔐 Source vault master password: ")?
         } else {
             String::new()
         };
 
         let target_vault_path = self.vault_path().clone();
 
-        let target_master = Self::prompt_master_password("🔐 Target vault master password: ")?;
+        let target_master = Self::prompt_password("🔐 Target vault master password: ")?;
 
         let mut current_data = Self::load(&target_vault_path, &target_master)?;
 
