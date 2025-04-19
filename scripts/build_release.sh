@@ -61,5 +61,7 @@ fi
 
 cp "$DEB_FILE" "$OUTPUT_DIR"
 
-echo "🎉 All builds are done! Binaries are in the '$OUTPUT_DIR' folder."
-ls $OUTPUT_DIR
+# Call tar.sh to package binaries
+bash "$(dirname "$0")/tar.sh"
+
+echo "🎉 Build & packaging completed!"
