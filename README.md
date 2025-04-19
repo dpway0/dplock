@@ -50,6 +50,20 @@ $ dplock list --filter git --sort name
 - **Rust**: Version 1.86 or newer.
 - **Supported Platforms**: Linux, macOS
 
+### 🍺 Homebrew
+
+First, add the tap:
+
+```bash
+brew tap dpway0/dplock
+```
+
+Then install `dplock`:
+
+```bash
+brew install dplock
+```
+
 ### Prebuilt binaries
 
 🏁 Ubuntu

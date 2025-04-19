@@ -19,7 +19,7 @@ for file in "${FILES[@]}"; do
         platform=$(echo "$file" | sed "s/${APP_NAME}-${VERSION}-//")
 
         # Rename the bin file to 'dplock'
-        mv "$file" "${APP_NAME}"
+        cp "$file" "${APP_NAME}"
         echo "🔄 Renamed: $file -> ${APP_NAME}"
 
         tarball="${APP_NAME}-${VERSION}-${platform}.tar.gz"
