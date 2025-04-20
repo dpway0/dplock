@@ -1,3 +1,5 @@
+use std::io;
+use std::io::Write;
 use anyhow::anyhow;
 use base64::Engine;
 use chrono::Utc;
@@ -99,3 +101,17 @@ pub fn parse_remind_time(expired: Option<i64>, input: &str) -> anyhow::Result<i6
         Ok(expired_secs - total_secs)
     }
 }
+
+pub fn compute_wait_time(attempts: u32) -> u64 {
+        2u64.pow((attempts - 5).min(5))
+    }
+    
+pub fn wait_with_countdown(wait_minutes: u64) -> anyhow::Result<()> {
+        for remaining in (1..=wait_minutes * 60).rev() {
+            print!("\r⏳ Please wait {} second(s)...", remaining);
+            io::stdout().flush()?;
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+        println!();
+        Ok(())
+    }

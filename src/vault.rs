@@ -10,7 +10,7 @@ use crossterm::event::{Event, KeyCode};
 use crossterm::{event};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use textwrap::wrap;
-use crate::utils::{get_terminal_width, is_encrypted, parse_expired_time, parse_remind_time};
+use crate::utils::{compute_wait_time, get_terminal_width, is_encrypted, parse_expired_time, parse_remind_time, wait_with_countdown};
 use std::env;
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -78,6 +78,32 @@ impl Vault {
         Ok(())
     }
     
+    fn save_attempts_to_keyring(&self, attempts: u32) -> Result<()> {
+        let service = "dplock_attempts";
+        let username = self.vault_path().to_string_lossy();
+        let entry = keyring::Entry::new(service, &username)?;
+        entry.set_password(&attempts.to_string())?;
+        Ok(())
+    }
+
+    fn load_attempts_from_keyring(&self) -> Result<u32> {
+        let service = "dplock_attempts";
+        let username = self.vault_path().to_string_lossy();
+        let entry = keyring::Entry::new(service, &username)?;
+        match entry.get_password() {
+            Ok(attempts) => Ok(attempts.parse().unwrap_or(0)),
+            Err(keyring::Error::NoEntry) => Ok(0),
+            Err(e) => Err(anyhow!("Keyring error: {e}")),
+        }
+    }
+
+    fn clear_attempts_from_keyring(&self) -> Result<()> {
+        let service = "dplock_attempts";
+        let username = self.vault_path().to_string_lossy();
+        let entry = keyring::Entry::new(service, &username)?;
+        let _ = entry.delete_password(); // Ignore if not found
+        Ok(())
+    }
 
     fn prompt_password(prompt: &str) -> Result<String> {
         prompt_password(prompt).map_err(|e| anyhow!("Failed to read password: {e}"))
@@ -86,8 +112,8 @@ impl Vault {
         let cache_duration: i64 = env::var("DPLOCK_CACHE_DURATION")
             .ok()
             .and_then(|val| val.parse().ok())
-            .unwrap_or(600); // Default to 600 seconds if not set or invalid
-
+            .unwrap_or(600); // Default to 600 seconds
+    
         if let Some(password) = self.load_master_from_keyring()? {
             let now = Utc::now().timestamp();
             let parts: Vec<&str> = password.splitn(2, ':').collect();
@@ -99,12 +125,35 @@ impl Vault {
             }
         }
     
-        let password = Self::prompt_password(prompt)?;
-        let now = Utc::now().timestamp();
-        self.save_master_to_keyring(&format!("{}:{}", now, password))?;
-        Ok(password)
+        let mut attempts = self.load_attempts_from_keyring()?;
+    
+        if attempts > 5 {
+            let wait_time = compute_wait_time(attempts);
+            println!("⏳ Too many failed attempts. Please wait {} minute(s) before trying again.", wait_time);
+            wait_with_countdown(wait_time)?;
+        }
+    
+        loop {
+            let password = Self::prompt_password(prompt)?;
+            if self.load_vault(&password).is_ok() {
+                let now = Utc::now().timestamp();
+                self.save_master_to_keyring(&format!("{}:{}", now, password))?;
+                self.clear_attempts_from_keyring()?;
+                return Ok(password);
+            } else {
+                attempts += 1;
+                self.save_attempts_to_keyring(attempts)?;
+                println!("❌ Incorrect password. Please try again.");
+    
+                if attempts > 5 {
+                    let wait_time = compute_wait_time(attempts);
+                    println!("⏳ Please wait {} minute(s) before trying again.", wait_time);
+                    wait_with_countdown(wait_time)?;
+                }
+            }
+        }
     }
-
+    
 
     fn prompt_optional_expired_time(prompt: &str) -> Result<Option<i64>> {
         print!("{}", prompt);
@@ -260,7 +309,6 @@ impl Vault {
                         data.entries.remove(name);
                     }
                 } else {
-                    // Cảnh báo khi xóa toàn bộ entries
                     println!("⚠️  This will remove ALL {} entr{} under '{}'.",
                              entry_list.len(),
                              if entry_list.len() > 1 { "ies" } else { "y" },
